@@ -1,0 +1,36 @@
+# Cada vez que subas un CSV a la carpeta entrada/, este flujo lo limpia,
+# lo agrega al CSV temático que corresponde y hace commit automáticamente.
+name: Procesar CSV recibidos
+
+on:
+  push:
+    paths:
+      - "entrada/*.csv"
+  workflow_dispatch: {}   # botón "Run workflow" para correrlo a mano
+
+permissions:
+  contents: write
+
+concurrency:
+  group: procesar-csv
+  cancel-in-progress: false
+
+jobs:
+  procesar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Limpiar y agregar datos
+        run: |
+          shopt -s nullglob
+          archivos=(entrada/*.csv)
+          if [ ${#archivos[@]} -eq 0 ]; then echo "No hay CSV en entrada/"; exit 0; fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          # Si tus CSV tienen una columna id, agrega:  --clave id
+          python scripts/procesar_csv.py "${archivos[@]}" --repo . --mover-procesados --commit --push
