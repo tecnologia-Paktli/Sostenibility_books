@@ -230,8 +230,11 @@ def ruta_nueva(repo, nombre_archivo, tema=None):
 
 def elegir_destino(ruta_recibida, encabezado, repo, tema=None):
     """Devuelve (ruta_destino, explicación, es_nuevo)."""
-    candidatos = buscar_csv_destino(repo)
     clave = normalizar_nombre(tema) if tema else normalizar_nombre(Path(ruta_recibida).stem)
+    # Un archivo que dice "ludoteca" solo puede ir a un CSV de la ludoteca, y viceversa.
+    # (Evita que arte_ludoteca.csv caiga en arte.csv de biblioteca.)
+    quiere_especial = SECCION_ESPECIAL in clave.split("_")
+    candidatos = [c for c in buscar_csv_destino(repo) if es_especial(c, repo) == quiere_especial]
 
     # Por nombre: 'historia_nov' -> historia.csv ; el nombre más largo gana
     por_nombre = [c for c in candidatos if clave == normalizar_nombre(c.stem)
@@ -250,7 +253,17 @@ def elegir_destino(ruta_recibida, encabezado, repo, tema=None):
             return mejor[1], f"por encabezados ({mejor[0]:.0%})", False
 
     # No existe: se crea
-    return ruta_nueva(repo, Path(ruta_recibida).name, tema), "tema nuevo: se crea el CSV", True
+    nueva = ruta_nueva(repo, Path(ruta_recibida).name, tema)
+    if nueva.exists():
+        return nueva, "por nombre de archivo", False
+    return nueva, "tema nuevo: se crea el CSV", True
+
+
+def es_especial(ruta, repo):
+    """True si el CSV pertenece a la ludoteca (por su carpeta o por su nombre)."""
+    partes = Path(ruta).relative_to(repo).parts
+    return SECCION_ESPECIAL in normalizar_nombre(Path(ruta).stem).split("_") or \
+        (len(partes) >= 3 and partes[0] == CARPETA_DATOS and normalizar_nombre(partes[1]) == SECCION_ESPECIAL)
 
 
 def encabezado_estandar(repo):
